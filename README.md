@@ -1,10 +1,6 @@
-# Mesure du risque de réidentification dans des bases médicales anonymisées
+# Measuring Re-identification Risk in Anonymized Medical Databases
 
-> **Projet Fil Rouge — M2 MIAS 2025–2026**
-> Aurélien Loison · Hugo Kazzi · Édouard Lansiaux
-> Encadré par Pr E. Chazard (PU-PH) et Pr S. Hammadi (CRIStAL)
-
-## Structure du dépôt
+## Repository Structure
 
 ```
 reidentification_risk/
@@ -159,6 +155,6 @@ Voir le rapport §6 pour la discussion sur Join Potential, Jensen-Shannon, CCA, 
 | N2 (Moyen) | 8 | Âge par tranche de 5, année+mois, + spécialité/chirurgie |
 | N3 (Élevé) | 11 | Âge exact, date complète, + diabète/IR/démence |
 
-## Licence
+## [Licence](https://github.com/edlansiaux/ridentif_risk_assessment/blob/main/LICENSE)
 
-Projet académique — UFR3S / École Centrale de Lille / Université de Lille.
+
