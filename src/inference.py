@@ -1,11 +1,11 @@
 """
-Indicateurs d'inférence — trois méthodes × deux types de codes.
+Inference indicators — three methods × two code types.
 
-Méthode A : Vote majoritaire bayésien   P(c|CE)
-Méthode B : Lift bayésien               P(c|CE) / P(c|global)
-Méthode C : Rareté pondérée             P(c|CE) × (1 - P(c|global))
+Method A : Bayesian majority vote   P(c|EC)
+Method B : Bayesian lift            P(c|EC) / P(c|global)
+Method C : Weighted rarity          P(c|EC) × (1 - P(c|global))
 
-Codes : CIM-10 (3 chars) et CCAM (4 chars).
+Codes: ICD-10 (3 chars) and CCAM (4 chars).
 """
 
 import numpy as np
@@ -15,31 +15,31 @@ from .config import N_SAMPLE, SEED
 
 
 # ═══════════════════════════════════════════════════════════════
-# Parseurs de codes
+# Code parsers
 # ═══════════════════════════════════════════════════════════════
 
 def truncate_diag(s) -> frozenset:
-    """CIM-10 → 3 premiers caractères."""
+    """ICD-10 → first 3 characters."""
     if pd.isna(s) or str(s).strip() == "":
         return frozenset()
     return frozenset(c.strip()[:3] for c in str(s).split(";") if len(c.strip()) >= 3)
 
 
 def truncate_acte(s) -> frozenset:
-    """CCAM → 4 premiers caractères."""
+    """CCAM → first 4 characters."""
     if pd.isna(s) or str(s).strip() == "":
         return frozenset()
     return frozenset(c.strip()[:4] for c in str(s).split(";") if len(c.strip()) >= 4)
 
 
 # ═══════════════════════════════════════════════════════════════
-# Construction de la vérité terrain
+# Ground truth construction
 # ═══════════════════════════════════════════════════════════════
 
 def build_ground_truth(df_original: pd.DataFrame) -> dict:
     """
-    Construit les dictionnaires de vérité terrain à partir de la base 0%.
-    Retourne {"diag": {id: frozenset(codes)}, "acte": {id: frozenset(codes)}}.
+    Builds ground truth dictionaries from the 0% baseline.
+    Returns {"diag": {id: frozenset(codes)}, "acte": {id: frozenset(codes)}}.
     """
     gt_diag = df_original.set_index("id_sejour")["liste_diag"].apply(truncate_diag).to_dict()
     gt_acte = df_original.set_index("id_sejour")["liste_acte"].apply(truncate_acte).to_dict()
@@ -47,7 +47,7 @@ def build_ground_truth(df_original: pd.DataFrame) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════
-# Fonction cœur — une passe = 3 méthodes
+# Core function — one pass = 3 methods
 # ═══════════════════════════════════════════════════════════════
 
 def run_inference_scenario(
@@ -60,12 +60,12 @@ def run_inference_scenario(
     seed: int = SEED,
 ) -> list[dict]:
     """
-    Pour chaque patient KB, calcule les 3 méthodes d'inférence.
-    Retourne 3 lignes par patient (une par méthode A/B/C).
+    For each KB patient, computes all 3 inference methods.
+    Returns 3 rows per patient (one per method A/B/C).
 
-    Chaque ligne contient :
-      id_sejour, method, is_correct, confiance, top1_proba,
-      n_codes_distincts, ec_size.
+    Each row contains:
+      id_sejour, method, is_correct, confidence, top1_proba,
+      n_distinct_codes, ec_size.
     """
     df_anon = df_anon.copy().reset_index(drop=True)
     df_anon.columns = df_anon.columns.str.strip()
@@ -79,14 +79,14 @@ def run_inference_scenario(
 
     anon_sets = df_anon[col_src].apply(trunc).values
 
-    # Distribution globale
+    # Global distribution
     all_codes = Counter()
     for s in anon_sets:
         all_codes.update(s)
     n_total = len(df_anon)
     p_global = {c: v / n_total for c, v in all_codes.items()}
 
-    # Pré-calcul des classes d'équivalence
+    # Pre-compute equivalence classes
     ec_map = df_anon.groupby(valid).indices
 
     df_kb_s = df_kb.sample(min(n_sample, len(df_kb)), random_state=seed).reset_index(drop=True)
@@ -105,8 +105,8 @@ def run_inference_scenario(
             for m in ["A", "B", "C"]:
                 rows.append({
                     "id_sejour": pid, "method": m,
-                    "is_correct": False, "confiance": 0.0,
-                    "top1_proba": 0.0, "n_codes_distincts": 0,
+                    "is_correct": False, "confidence": 0.0,
+                    "top1_proba": 0.0, "n_distinct_codes": 0,
                     "ec_size": 0,
                 })
             continue
@@ -124,13 +124,13 @@ def run_inference_scenario(
             for m in ["A", "B", "C"]:
                 rows.append({
                     "id_sejour": pid, "method": m,
-                    "is_correct": False, "confiance": 0.0,
-                    "top1_proba": 0.0, "n_codes_distincts": 0,
+                    "is_correct": False, "confidence": 0.0,
+                    "top1_proba": 0.0, "n_distinct_codes": 0,
                     "ec_size": ec_size,
                 })
             continue
 
-        # Trois méthodes de scoring
+        # Three scoring methods
         scores_A = {c: n / ec_size for c, n in code_counts.items()}
         scores_B = {
             c: (n / ec_size) / p_global.get(c, 1.0 / n_total)
@@ -148,33 +148,33 @@ def run_inference_scenario(
             conf = (1.0 - s2_val / s1_val) if s1_val > 0 else 0.0
 
             rows.append({
-                "id_sejour": pid,
-                "method": mname,
-                "is_correct": s1_code in true_codes,
-                "confiance": conf * 100,
-                "top1_proba": (code_counts[s1_code] / ec_size) * 100,
-                "n_codes_distincts": n_distincts,
-                "ec_size": ec_size,
+                "id_sejour":       pid,
+                "method":          mname,
+                "is_correct":      s1_code in true_codes,
+                "confidence":      conf * 100,
+                "top1_proba":      (code_counts[s1_code] / ec_size) * 100,
+                "n_distinct_codes": n_distincts,
+                "ec_size":         ec_size,
             })
 
     return rows
 
 
 # ═══════════════════════════════════════════════════════════════
-# Agrégation des résultats individuels
+# Aggregation of individual results
 # ═══════════════════════════════════════════════════════════════
 
 def aggregate_inference(df_ind: pd.DataFrame, threshold: float = 50.0) -> pd.DataFrame:
     """
-    Agrège df_individuel_inf en un DataFrame d'indicateurs par groupe :
-      (mélange_%, mode, niveau, method, code_type).
+    Aggregates individual inference data into an indicators DataFrame by group:
+      (shuffling_%, mode, level, method, code_type).
 
-    Métriques calculées :
-      acc, certitude, conf_mean, conf_win, conf_fail,
-      delta_diso, m1_unicite, m2_restreint, m3_incertain,
-      mat_critique, mat_leurre, mat_noye, mat_echec.
+    Computed metrics:
+      acc, certainty, conf_mean, conf_win, conf_fail,
+      delta_diso, m1_uniqueness, m2_restricted, m3_uncertain,
+      mat_critical, mat_decoy, mat_submerged, mat_failure.
     """
-    grp = df_ind.groupby(["mélange_%", "mode", "niveau", "method", "code_type"])
+    grp = df_ind.groupby(["shuffling_%", "mode", "level", "method", "code_type"])
     out = []
 
     for keys, sub in grp:
@@ -182,17 +182,17 @@ def aggregate_inference(df_ind: pd.DataFrame, threshold: float = 50.0) -> pd.Dat
         if n == 0:
             continue
         ic = sub["is_correct"].astype(bool).values
-        cf = sub["confiance"].values
-        nd = sub["n_codes_distincts"].values
+        cf = sub["confidence"].values
+        nd = sub["n_distinct_codes"].values
 
         acc = ic.mean() * 100
-        certitude = (cf >= threshold).mean() * 100
+        certainty = (cf >= threshold).mean() * 100
         conf_mean = cf.mean()
         conf_win = cf[ic].mean() if ic.any() else 0.0
         conf_fail = cf[~ic].mean() if (~ic).any() else 0.0
-        delta_diso = certitude - acc
+        delta_diso = certainty - acc
 
-        # Règles M1/M2/M3
+        # M1/M2/M3 rules
         m1 = nd == 1
         m1_acc = ic[m1].mean() * 100 if m1.any() else 0.0
 
@@ -202,22 +202,22 @@ def aggregate_inference(df_ind: pd.DataFrame, threshold: float = 50.0) -> pd.Dat
         m3 = (nd >= 1) & (nd <= 5)
         m3_acc = (ic[m3].astype(float) / nd[m3]).mean() * 100 if m3.any() else 0.0
 
-        # Matrice 4 quadrants
+        # 4-quadrant matrix
         high = cf >= threshold
-        mat_crit = (high & ic).sum() / n * 100
-        mat_leur = (high & ~ic).sum() / n * 100
-        mat_noye = (~high & ic).sum() / n * 100
-        mat_ech = (~high & ~ic).sum() / n * 100
+        mat_crit = (high & ic).sum()  / n * 100
+        mat_decoy = (high & ~ic).sum() / n * 100
+        mat_subm = (~high & ic).sum() / n * 100
+        mat_fail = (~high & ~ic).sum() / n * 100
 
         out.append({
-            "mélange_%": keys[0], "mode": keys[1], "niveau": keys[2],
+            "shuffling_%": keys[0], "mode": keys[1], "level": keys[2],
             "method": keys[3], "code_type": keys[4],
-            "acc": acc, "certitude": certitude, "conf_mean": conf_mean,
+            "acc": acc, "certainty": certainty, "conf_mean": conf_mean,
             "conf_win": conf_win, "conf_fail": conf_fail,
             "delta_diso": delta_diso,
-            "m1_unicite": m1_acc, "m2_restreint": m2_acc, "m3_incertain": m3_acc,
-            "mat_critique": mat_crit, "mat_leurre": mat_leur,
-            "mat_noye": mat_noye, "mat_echec": mat_ech,
+            "m1_uniqueness": m1_acc, "m2_restricted": m2_acc, "m3_uncertain": m3_acc,
+            "mat_critical": mat_crit, "mat_decoy": mat_decoy,
+            "mat_submerged": mat_subm, "mat_failure": mat_fail,
         })
 
     return pd.DataFrame(out)
