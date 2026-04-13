@@ -4,18 +4,18 @@
 
 ```
 reidentification_risk/
-├── run_all.py                  # Point d'entrée principal
+├── run_all.py                  # Main entry point
 ├── requirements.txt
 ├── README.md
 ├── src/
 │   ├── __init__.py
-│   ├── config.py               # Configuration : QI, paliers, chemins, seuils
-│   ├── data_loader.py          # Chargement des données (KB + fichiers transformés)
-│   ├── individualization.py    # 7 méthodes d'attaque par individualisation
-│   ├── inference.py            # 3 méthodes d'inférence (A/B/C) × 2 codes
-│   └── visualization.py       # Toutes les fonctions de tracé
-├── projet_donnees/             # ← Placer les données ici
-│   ├── connaissances_externes.txt
+│   ├── config.py               # Configuration: QIs, thresholds, paths, risk bands
+│   ├── data_loader.py          # Data loading (KB + transformed files)
+│   ├── individualization.py    # 7 individualization attack methods
+│   ├── inference.py            # 3 inference methods (A/B/C) × 2 code types
+│   └── visualization.py       # All plotting functions
+├── project_data/               # ← Place data files here
+│   ├── external_knowledge.txt
 │   ├── out_direct_0.txt
 │   ├── out_direct_5.txt
 │   ├── ...
@@ -23,9 +23,9 @@ reidentification_risk/
 │   ├── out_sample_0.txt
 │   ├── ...
 │   └── out_sample_100.txt
-└── outputs/                    # Résultats générés automatiquement
-    ├── figures/                # PNG des graphiques
-    └── tables/                 # CSV des indicateurs
+└── outputs/                    # Auto-generated results
+    ├── figures/                # PNG charts
+    └── tables/                 # CSV indicators
 ```
 
 ## Installation
@@ -34,127 +34,125 @@ reidentification_risk/
 pip install -r requirements.txt
 ```
 
-## Utilisation
+## Usage
 
-### Lancer toutes les expériences
+### Run all experiments
 
 ```bash
 python run_all.py
 ```
 
-**Durée estimée** : 30–60 min (1000 patients × 21 paliers × 2 modes × 3 niveaux).
+**Estimated duration**: 30–60 min (1000 patients × 21 thresholds × 2 modes × 3 levels).
 
-### Mode rapide (test)
+### Fast mode (test)
 
 ```bash
 python run_all.py --fast
 ```
 
-6 paliers seulement, 200 patients → ~5 min.
+6 thresholds only, 200 patients → ~5 min.
 
-### Individualisation seule
+### Individualization only
 
 ```bash
 python run_all.py --only indiv
 ```
 
-### Inférence seule
+### Inference only
 
 ```bash
 python run_all.py --only inference
 ```
 
-## Données attendues
+## Expected Data
 
-Les fichiers doivent être dans `projet_donnees/` au format TSV (tab-separated).
+Files must be placed in `project_data/` in TSV (tab-separated) format.
 
-| Fichier | Description |
-|---------|-------------|
-| `connaissances_externes.txt` | Base de connaissances (vérité terrain avec tous les QI) |
-| `out_direct_XX.txt` | Données directes avec XX % des cellules mélangées |
-| `out_sample_XX.txt` | Données échantillonnées avec remise + XX % de mélange |
+| File | Description |
+|------|-------------|
+| `external_knowledge.txt` | Knowledge base (ground truth with all QIs) |
+| `out_direct_XX.txt` | Direct data with XX % of cells shuffled |
+| `out_sample_XX.txt` | Sampled data with replacement + XX % shuffling |
 
 XX ∈ {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100}
 
-### Colonnes requises
+### Required Columns
 
-| Catégorie | Colonnes |
-|-----------|----------|
+| Category | Columns |
+|----------|---------|
 | ID | `id_sejour` |
-| Démographie | `age`, `age5`, `age10`, `sexe` |
-| Séjour | `entree_mode`, `sortie_mode`, `specialite`, `chirurgie` |
+| Demographics | `age`, `age5`, `age10`, `sexe` |
+| Stay | `entree_mode`, `sortie_mode`, `specialite`, `chirurgie` |
 | Dates | `entree_date_y`, `entree_date_ym`, `entree_date_ymd`, `sortie_date_y`, `sortie_date_ym`, `sortie_date_ymd` |
-| Comorbidités | `diabete`, `insuffisance_renale`, `demence` |
-| Sensibles | `liste_diag` (codes CIM-10, séparés par `;`), `liste_acte` (codes CCAM, séparés par `;`) |
+| Comorbidities | `diabete`, `insuffisance_renale`, `demence` |
+| Sensitive | `liste_diag` (ICD-10 codes, `;`-separated), `liste_acte` (CCAM codes, `;`-separated) |
 
-## Méthodes implémentées
+## Implemented Methods
 
-### Individualisation (7 méthodes)
+### Individualization (7 methods)
 
-| # | Méthode | Fonction | Description |
-|---|---------|----------|-------------|
-| 1 | Match exact 1/N | `match_exact_1_over_n()` | Probabilité de réidentification par correspondance parfaite |
-| 2 | Match strict N=1 | `match_exact_strict()` | Réidentification uniquement si un seul suspect ET correct |
-| 3 | Matrice de confiance | `confidence_matrix()` | 4 quadrants : succès critique / leurre / noyé / échec |
-| 4 | Fiabilité hacker | `hacker_accuracy()` | Précision sous 3 règles (unicité, groupe restreint, incertitude) |
-| 5 | Score rareté | `weighted_rarity_score()` | Pondération par information propre + gap top1/top2 |
-| 6 | Monte-Carlo LOO | `monte_carlo_stability()` | Leave-one-out sur les QI avec vote par stabilité |
-| 7 | Score net | `risk_score_net()` | Calibration : +confiance si juste, −confiance si faux |
+| # | Method | Function | Description |
+|---|--------|----------|-------------|
+| 1 | Exact match 1/N | `match_exact_1_over_n()` | Re-identification probability via perfect match |
+| 2 | Strict match N=1 | `match_exact_strict()` | Re-identification only if single suspect AND correct |
+| 3 | Confidence matrix | `confidence_matrix()` | 4 quadrants: critical success / decoy / submerged / failure |
+| 4 | Hacker accuracy | `hacker_accuracy()` | Precision under 3 rules (uniqueness, restricted group, uncertainty) |
+| 5 | Rarity score | `weighted_rarity_score()` | Weighting by self-information + top1/top2 gap |
+| 6 | Monte-Carlo LOO | `monte_carlo_stability()` | Leave-one-out over QIs with stability vote |
+| 7 | Net score | `risk_score_net()` | Calibration: +confidence if correct, −confidence if wrong |
 
-### Inférence (3 méthodes × 2 types de codes)
+### Inference (3 methods × 2 code types)
 
-| Méthode | Scoring | Intuition |
-|---------|---------|-----------|
-| A — Vote majoritaire | P(c\|CE) | Code le plus fréquent dans la classe d'équivalence |
-| B — Lift bayésien | P(c\|CE) / P(c\|global) | Pénalise les codes banals (esprit t-closeness) |
-| C — Rareté pondérée | P(c\|CE) × (1 − P(c\|global)) | Favorise les codes rares localement dominants |
+| Method | Scoring | Intuition |
+|--------|---------|-----------|
+| A — Majority vote | P(c\|EC) | Most frequent code within the equivalence class |
+| B — Bayesian lift | P(c\|EC) / P(c\|global) | Penalizes common codes (t-closeness spirit) |
+| C — Weighted rarity | P(c\|EC) × (1 − P(c\|global)) | Favors locally dominant rare codes |
 
-Appliquées sur :
-- **CIM-10** : diagnostics tronqués à 3 caractères
-- **CCAM** : actes tronqués à 4 caractères
+Applied to:
+- **ICD-10**: diagnoses truncated to 3 characters
+- **CCAM**: procedures truncated to 4 characters
 
-### Corrélation
+### Correlation
 
-Approche bibliographique (pas de code — une seule base disponible).
-Voir le rapport §6 pour la discussion sur Join Potential, Jensen-Shannon, CCA, et linkage simulé.
+Bibliographic approach (no code — only one database available).
+See report §6 for discussion on Join Potential, Jensen-Shannon, CCA, and simulated linkage.
 
-## Sorties
+## Outputs
 
 ### Tables (CSV)
 
-| Fichier | Contenu |
-|---------|---------|
-| `indiv_1_match_exact_1N.csv` | Taux 1/N par palier × mode × niveau |
-| `indiv_2_match_strict.csv` | Taux strict par palier × mode × niveau |
-| `indiv_4_hacker_accuracy.csv` | Fiabilité M1/M2/M3 |
-| `indiv_5_rarity_score.csv` | Accuracy + confiance win/fail |
-| `indiv_6_monte_carlo.csv` | Données individuelles Monte-Carlo |
-| `indiv_7_risk_score_net.csv` | Score net [-100, 100] |
-| `inference_individuel.csv` | Données individuelles d'inférence |
-| `inference_indicateurs.csv` | Indicateurs agrégés d'inférence |
+| File | Content |
+|------|---------|
+| `indiv_1_match_exact_1N.csv` | 1/N rate by threshold × mode × level |
+| `indiv_2_match_strict.csv` | Strict rate by threshold × mode × level |
+| `indiv_4_hacker_accuracy.csv` | M1/M2/M3 accuracy |
+| `indiv_5_rarity_score.csv` | Accuracy + win/fail confidence |
+| `indiv_6_monte_carlo.csv` | Monte-Carlo individual data |
+| `indiv_7_risk_score_net.csv` | Net score [-100, 100] |
+| `inference_individuel.csv` | Individual inference data |
+| `inference_indicateurs.csv` | Aggregated inference indicators |
 
 ### Figures (PNG)
 
-| Préfixe | Contenu |
-|---------|---------|
-| `A1_*` | Match exact 1/N |
-| `A2_*` | Match strict |
-| `A3_*` | Matrice de confiance (barres empilées) |
-| `A8_*` | Monte-Carlo + rareté |
-| `B1_*` | Taux d'inférence réel (grille 2×3) |
-| `B2_*` | Certitude & risque d'inférence |
-| `B4_*` | Indice de désorientation Δ |
-| `B5_*` | Matrice de risque inférence (4 quadrants) |
-| `B7_*` | Distinction vrai/faux (capacité de filtrage) |
+| Prefix | Content |
+|--------|---------|
+| `A1_*` | Exact match 1/N |
+| `A2_*` | Strict match |
+| `A3_*` | Confidence matrix (stacked bars) |
+| `A8_*` | Monte-Carlo + rarity |
+| `B1_*` | Real inference rate (2×3 grid) |
+| `B2_*` | Certainty & inference risk |
+| `B4_*` | Disorientation index Δ |
+| `B5_*` | Inference risk matrix (4 quadrants) |
+| `B7_*` | True/false distinction (filtering capacity) |
 
-## Niveaux de connaissance attaquant
+## Attacker Knowledge Levels
 
-| Niveau | QI | Granularité |
-|--------|----|-------------|
-| N1 (Faible) | 6 | Âge par tranche de 10, année seule, mode entrée/sortie |
-| N2 (Moyen) | 8 | Âge par tranche de 5, année+mois, + spécialité/chirurgie |
-| N3 (Élevé) | 11 | Âge exact, date complète, + diabète/IR/démence |
+| Level | QIs | Granularity |
+|-------|-----|-------------|
+| N1 (Low) | 6 | Age in 10-year bands, year only, admission/discharge mode |
+| N2 (Medium) | 8 | Age in 5-year bands, year+month, + specialty/surgery |
+| N3 (High) | 11 | Exact age, full date, + diabetes/renal failure/dementia |
 
-## [Licence](https://github.com/edlansiaux/ridentif_risk_assessment/blob/main/LICENSE)
-
-
+## [License](https://github.com/edlansiaux/ridentif_risk_assessment/blob/main/LICENSE)
