@@ -1,13 +1,13 @@
 """
-Indicateurs d'individualisation — sept approches complémentaires.
+Individualization indicators — seven complementary approaches.
 
-Méthode 1 : Match exact (probabilité 1/N)
-Méthode 2 : Match exact strict (N=1 unique & correct)
-Méthode 3 : Matrice de confiance (4 quadrants perception/réalité)
-Méthode 4 : Fiabilité du hacker (unicité, groupe restreint, incertitude)
-Méthode 5 : Score pondéré par la rareté + indice de confiance (gap)
-Méthode 6 : Monte-Carlo leave-one-out + rareté
-Méthode 7 : Score net de l'attaquant (calibration de confiance)
+Method 1 : Exact match (1/N probability)
+Method 2 : Strict exact match (N=1 unique & correct)
+Method 3 : Confidence matrix (4 quadrants: perception/reality)
+Method 4 : Hacker accuracy (uniqueness, restricted group, uncertainty)
+Method 5 : Rarity-weighted score + confidence index (gap)
+Method 6 : Monte-Carlo leave-one-out + rarity
+Method 7 : Attacker net score (confidence calibration)
 """
 
 import numpy as np
@@ -16,7 +16,7 @@ from .config import N_SAMPLE, N_MONTE_CARLO, BATCH_SIZE, SEED
 
 
 # ═══════════════════════════════════════════════════════════════
-# Utilitaire : validation des colonnes
+# Utility: column validation
 # ═══════════════════════════════════════════════════════════════
 
 def _valid_qi(qi_cols: list[str], df_anon: pd.DataFrame) -> list[str]:
@@ -25,11 +25,11 @@ def _valid_qi(qi_cols: list[str], df_anon: pd.DataFrame) -> list[str]:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 1. Match exact — probabilité de réidentification 1/N
+# 1. Exact match — 1/N re-identification probability
 # ═══════════════════════════════════════════════════════════════
 
 def match_exact_1_over_n(df_kb, df_anon, qi_cols) -> float:
-    """Retourne le taux de réidentification (%) par probabilité 1/N."""
+    """Returns the re-identification rate (%) via 1/N probability."""
     df_anon = df_anon.copy()
     valid = _valid_qi(qi_cols, df_anon)
     if not valid:
@@ -53,11 +53,11 @@ def match_exact_1_over_n(df_kb, df_anon, qi_cols) -> float:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 2. Match exact strict (N=1 unique & correct)
+# 2. Strict exact match (N=1 unique & correct)
 # ═══════════════════════════════════════════════════════════════
 
 def match_exact_strict(df_kb, df_anon, qi_cols) -> float:
-    """Retourne le taux (%) de réidentification stricte : un seul suspect ET correct."""
+    """Returns the strict re-identification rate (%): single suspect AND correct."""
     df_anon = df_anon.copy()
     df_anon.columns = df_anon.columns.str.strip()
     valid = _valid_qi(qi_cols, df_anon)
@@ -85,23 +85,23 @@ def match_exact_strict(df_kb, df_anon, qi_cols) -> float:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 3. Matrice de confiance (4 quadrants)
+# 3. Confidence matrix (4 quadrants)
 # ═══════════════════════════════════════════════════════════════
 
 def confidence_matrix(df_kb, df_anon, qi_cols) -> dict:
     """
-    Retourne un dict avec les pourcentages :
-      critique  : match unique & correct
-      leurre    : match unique & incorrect
-      noye      : match multiple & correct
-      echec     : le reste
-    + delta     : indice de désorientation
+    Returns a dict with percentages:
+      critical  : unique match & correct
+      decoy     : unique match & incorrect
+      submerged : multiple matches & correct
+      failure   : everything else
+    + delta     : disorientation index
     """
     df_anon = df_anon.copy()
     df_anon.columns = df_anon.columns.str.strip()
     valid = _valid_qi(qi_cols, df_anon)
     if not valid or df_anon.empty:
-        return {"critique": 0, "leurre": 0, "noye": 0, "echec": 100, "delta": 0}
+        return {"critical": 0, "decoy": 0, "submerged": 0, "failure": 100, "delta": 0}
 
     counts = df_anon.groupby(valid).size().reset_index(name="n_suspects")
     matches = pd.merge(
@@ -110,39 +110,39 @@ def confidence_matrix(df_kb, df_anon, qi_cols) -> dict:
         on=valid, how="inner", suffixes=("_kb", "_anon"),
     )
     if matches.empty:
-        return {"critique": 0, "leurre": 0, "noye": 0, "echec": 100, "delta": 0}
+        return {"critical": 0, "decoy": 0, "submerged": 0, "failure": 100, "delta": 0}
 
     matches["is_correct"] = matches["id_sejour_kb"] == matches["id_sejour_anon"]
     matches = pd.merge(matches, counts, on=valid, how="left")
 
     n = len(df_kb)
     crit = ((matches["n_suspects"] == 1) & matches["is_correct"]).sum()
-    leurre = ((matches["n_suspects"] == 1) & ~matches["is_correct"]).sum()
-    noye = ((matches["n_suspects"] > 1) & matches["is_correct"]).sum()
-    echec = n - crit - leurre - noye
+    decoy = ((matches["n_suspects"] == 1) & ~matches["is_correct"]).sum()
+    submerged = ((matches["n_suspects"] > 1) & matches["is_correct"]).sum()
+    failure = n - crit - decoy - submerged
 
-    confiance = (matches["n_suspects"] == 1).sum() / n * 100
-    reussite = matches["is_correct"].sum() / n * 100
+    confidence = (matches["n_suspects"] == 1).sum() / n * 100
+    success_rate = matches["is_correct"].sum() / n * 100
 
     return {
-        "critique": crit / n * 100,
-        "leurre": leurre / n * 100,
-        "noye": noye / n * 100,
-        "echec": echec / n * 100,
-        "delta": confiance - reussite,
+        "critical":  crit / n * 100,
+        "decoy":     decoy / n * 100,
+        "submerged": submerged / n * 100,
+        "failure":   failure / n * 100,
+        "delta":     confidence - success_rate,
     }
 
 
 # ═══════════════════════════════════════════════════════════════
-# 4. Fiabilité du hacker (3 règles)
+# 4. Hacker accuracy (3 rules)
 # ═══════════════════════════════════════════════════════════════
 
 def hacker_accuracy(df_kb, df_anon, qi_cols) -> dict:
     """
-    Retourne les taux de fiabilité (%) sous trois règles :
-      m1_unicite    : parmi les N=1, % corrects
-      m2_restreint  : parmi les N≤2, moyenne de (correct/N)
-      m3_incertain  : parmi les N≤5, moyenne de (correct/N)
+    Returns accuracy rates (%) under three rules:
+      m1_uniqueness  : among N=1, % correct
+      m2_restricted  : among N≤2, mean of (correct/N)
+      m3_uncertain   : among N≤5, mean of (correct/N)
     """
     df_anon = df_anon.copy()
     df_anon.columns = df_anon.columns.str.strip()
@@ -174,14 +174,14 @@ def hacker_accuracy(df_kb, df_anon, qi_cols) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════
-# 5. Score pondéré par la rareté + indice de confiance (gap)
+# 5. Rarity-weighted score + confidence index (gap)
 # ═══════════════════════════════════════════════════════════════
 
 def weighted_rarity_score(df_kb, df_anon, qi_cols,
                           n_sample=N_SAMPLE, batch_size=BATCH_SIZE) -> dict:
     """
     Score(i,j) = Σ 1[QI_k(i)=QI_k(j)] × log(1/freq(QI_k(i)))
-    Retourne : acc, conf_mean, conf_win, conf_fail (tous en %).
+    Returns: acc, conf_mean, conf_win, conf_fail (all in %).
     """
     df_anon = df_anon.copy()
     df_anon.columns = df_anon.columns.str.strip()
@@ -234,22 +234,22 @@ def weighted_rarity_score(df_kb, df_anon, qi_cols,
     c = np.array(all_correct)
     f = np.array(all_conf)
     return {
-        "acc": c.mean() * 100,
-        "conf_win": f[c].mean() * 100 if c.any() else 0,
+        "acc":       c.mean() * 100,
+        "conf_win":  f[c].mean() * 100 if c.any() else 0,
         "conf_fail": f[~c].mean() * 100 if (~c).any() else 0,
     }
 
 
 # ═══════════════════════════════════════════════════════════════
-# 6. Monte-Carlo leave-one-out + rareté (stabilité individuelle)
+# 6. Monte-Carlo leave-one-out + rarity (individual stability)
 # ═══════════════════════════════════════════════════════════════
 
 def monte_carlo_stability(df_kb, df_anon, qi_cols,
                           n_sample=N_SAMPLE) -> list[dict]:
     """
-    Pour chaque individu, retire systématiquement chaque QI (leave-one-out)
-    et vote sur le candidat le plus stable.
-    Retourne une liste de dicts par individu : {id_sejour, confiance, is_correct}.
+    For each individual, systematically removes each QI (leave-one-out)
+    and votes on the most stable candidate.
+    Returns a list of per-individual dicts: {id_sejour, confidence, is_correct}.
     """
     df_anon_c = df_anon.copy()
     df_anon_c.columns = df_anon_c.columns.str.strip()
@@ -287,22 +287,22 @@ def monte_carlo_stability(df_kb, df_anon, qi_cols,
     for i in range(len(df_kb_s)):
         cand = max(votes[i], key=votes[i].get)
         results.append({
-            "id_sejour": kb_ids[i],
-            "confiance": votes[i][cand] / n_iter * 100,
+            "id_sejour":  kb_ids[i],
+            "confidence": votes[i][cand] / n_iter * 100,
             "is_correct": int(cand == kb_ids[i]),
         })
     return results
 
 
 # ═══════════════════════════════════════════════════════════════
-# 7. Score net de l'attaquant (Monte-Carlo + calibration)
+# 7. Attacker net score (Monte-Carlo + calibration)
 # ═══════════════════════════════════════════════════════════════
 
 def risk_score_net(df_kb, df_anon, qi_cols,
                    n_sample=500, n_iterations=N_MONTE_CARLO) -> float:
     """
-    Score net ∈ [-100, 100].
-    Positif = attaque rentable ; négatif = attaque contre-productive.
+    Net score ∈ [-100, 100].
+    Positive = profitable attack; negative = counterproductive attack.
     """
     df_kb_s = df_kb.sample(min(n_sample, len(df_kb)), random_state=SEED)
     anon_ids = df_anon["id_sejour"].values
@@ -343,21 +343,21 @@ def risk_score_net(df_kb, df_anon, qi_cols,
 
 
 # ═══════════════════════════════════════════════════════════════
-# 5b. Matrice pondérée par rareté (4 quadrants avec seuil)
+# 5b. Rarity-weighted risk matrix (4 quadrants with threshold)
 # ═══════════════════════════════════════════════════════════════
 
 def weighted_risk_matrix(df_kb, df_anon, qi_cols,
                          threshold=0.5, n_sample=N_SAMPLE,
                          batch_size=BATCH_SIZE) -> dict:
     """
-    Matrice perception/réalité basée sur le score de rareté.
-    Retourne : {critique, leurre, noye, echec} en pourcentages.
+    Perception/reality matrix based on rarity score.
+    Returns: {critical, decoy, submerged, failure} as percentages.
     """
     df_anon = df_anon.copy()
     df_anon.columns = df_anon.columns.str.strip()
     valid = _valid_qi(qi_cols, df_anon)
     if not valid or df_anon.empty:
-        return {"critique": 0, "leurre": 0, "noye": 0, "echec": 100}
+        return {"critical": 0, "decoy": 0, "submerged": 0, "failure": 100}
 
     col_weights = {
         col: 1.0 - df_anon[col].value_counts(normalize=True) for col in valid
@@ -404,8 +404,8 @@ def weighted_risk_matrix(df_kb, df_anon, qi_cols,
     n = len(c)
 
     return {
-        "critique": ((f >= threshold) & c).sum() / n * 100,
-        "leurre":   ((f >= threshold) & ~c).sum() / n * 100,
-        "noye":     ((f < threshold)  & c).sum() / n * 100,
-        "echec":    ((f < threshold)  & ~c).sum() / n * 100,
+        "critical":  ((f >= threshold) & c).sum()  / n * 100,
+        "decoy":     ((f >= threshold) & ~c).sum() / n * 100,
+        "submerged": ((f < threshold)  & c).sum()  / n * 100,
+        "failure":   ((f < threshold)  & ~c).sum() / n * 100,
     }
