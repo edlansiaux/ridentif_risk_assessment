@@ -1,9 +1,9 @@
 """
-Configuration centrale — quasi-identifiants, paliers, chemins.
+Central configuration — quasi-identifiers, thresholds, paths.
 """
 
 # ═══════════════════════════════════════════════════════════════
-# Quasi-identifiants par niveau de connaissance attaquant
+# Quasi-identifiers by attacker knowledge level
 # ═══════════════════════════════════════════════════════════════
 
 QI_N1 = [
@@ -28,13 +28,13 @@ QI_N3 = [
 ]
 
 LEVELS = {
-    "n1": {"qi": QI_N1, "label": "N1 (Faible)", "color": "#2ecc71"},
-    "n2": {"qi": QI_N2, "label": "N2 (Moyen)",  "color": "#3498db"},
-    "n3": {"qi": QI_N3, "label": "N3 (Élevé)",  "color": "#e74c3c"},
+    "n1": {"qi": QI_N1, "label": "N1 (Low)",    "color": "#2ecc71"},
+    "n2": {"qi": QI_N2, "label": "N2 (Medium)", "color": "#3498db"},
+    "n3": {"qi": QI_N3, "label": "N3 (High)",   "color": "#e74c3c"},
 }
 
 # ═══════════════════════════════════════════════════════════════
-# Paliers de mélange testés
+# Shuffling thresholds tested
 # ═══════════════════════════════════════════════════════════════
 
 PERCENTAGES = list(range(0, 105, 5))           # 0, 5, 10, …, 100
@@ -42,34 +42,34 @@ PERCENTAGES_COARSE = list(range(0, 110, 10))   # 0, 10, 20, …, 100
 MODES = ["direct", "sample"]
 
 # ═══════════════════════════════════════════════════════════════
-# Chemins
+# Paths
 # ═══════════════════════════════════════════════════════════════
 
-DATA_DIR         = "projet_donnees"
-KB_FILE          = f"{DATA_DIR}/connaissances_externes.txt"
+DATA_DIR         = "project_data"
+KB_FILE          = f"{DATA_DIR}/external_knowledge.txt"
 OUTPUT_DIR       = "outputs"
 FIGURES_DIR      = f"{OUTPUT_DIR}/figures"
 TABLES_DIR       = f"{OUTPUT_DIR}/tables"
 
 # ═══════════════════════════════════════════════════════════════
-# Hyper-paramètres expérimentaux
+# Experimental hyperparameters
 # ═══════════════════════════════════════════════════════════════
 
-N_SAMPLE          = 1000    # Patients testés par configuration
-N_MONTE_CARLO     = 20      # Itérations Monte-Carlo (leave-one-out)
-BATCH_SIZE        = 500     # Taille de batch pour le scoring pondéré
-CONFIDENCE_THRESH = 50.0    # Seuil de confiance (%) pour la matrice
+N_SAMPLE          = 1000    # Patients tested per configuration
+N_MONTE_CARLO     = 20      # Monte-Carlo iterations (leave-one-out)
+BATCH_SIZE        = 500     # Batch size for weighted scoring
+CONFIDENCE_THRESH = 50.0    # Confidence threshold (%) for the matrix
 SEED              = 42
 
 # ═══════════════════════════════════════════════════════════════
-# Seuils de risque (pour les bandes colorées)
+# Risk thresholds (for colored bands)
 # ═══════════════════════════════════════════════════════════════
 
 RISK_BANDS = [
-    (0,   5,  "#32CD32", 0.15, "Très sûr (0–5 %)"),
-    (5,  10,  "#006400", 0.15, "Sûr (5–10 %)"),
-    (10, 20,  "#FFD700", 0.25, "Vigilance (10–20 %)"),
-    (20, 35,  "#FF8C00", 0.25, "Risque élevé (20–35 %)"),
+    (0,   5,  "#32CD32", 0.15, "Very safe (0–5 %)"),
+    (5,  10,  "#006400", 0.15, "Safe (5–10 %)"),
+    (10, 20,  "#FFD700", 0.25, "Caution (10–20 %)"),
+    (20, 35,  "#FF8C00", 0.25, "High risk (20–35 %)"),
     (35, 50,  "#FF0000", 0.15, "Danger (35–50 %)"),
-    (50, 100, "#000000", 0.35, "Critique (>50 %)"),
+    (50, 100, "#000000", 0.35, "Critical (>50 %)"),
 ]
